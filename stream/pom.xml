@@ -35,6 +35,7 @@
     <module>statelib</module>
     <module>api</module>
     <module>proto</module>
+    <module>streaming</module>
     <module>clients</module>
     <module>storage</module>
     <module>server</module>

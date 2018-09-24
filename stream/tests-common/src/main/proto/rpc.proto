@@ -24,6 +24,7 @@ option java_package = "org.bookkeeper.tests.proto.rpc";
 
 message PingRequest {
     int64 sequence = 1;
+    int64 payload_size = 2;
 }
 
 message PongResponse {
@@ -31,6 +32,16 @@ message PongResponse {
     int32 num_ping_received = 2;
     // the slot id in this stream of pong responses.
     int32 slot_id = 3;
+}
+
+message ChunkPingRequest {
+    bytes header = 1;
+    bytes payload = 1000;
+}
+
+message ChunkPongResponse {
+    bytes header = 1;
+    bytes payload = 1000;
 }
 
 service PingPongService {
@@ -42,6 +53,10 @@ service PingPongService {
     rpc LotsOfPongs(PingRequest) returns (stream PongResponse) {}
 
     rpc BidiPingPong(stream PingRequest) returns (stream PongResponse) {}
+
+    rpc LotsOfChunkPings(stream ChunkPingRequest) returns (ChunkPongResponse) {}
+
+    rpc LotsOfChunkPongs(ChunkPingRequest) returns (stream ChunkPongResponse) {}
 
 }
 
