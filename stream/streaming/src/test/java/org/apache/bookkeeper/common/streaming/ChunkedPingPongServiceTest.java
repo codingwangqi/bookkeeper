@@ -18,6 +18,7 @@
 
 package org.apache.bookkeeper.common.streaming;
 
+import static org.apache.bookkeeper.common.concurrent.FutureUtils.result;
 import static org.junit.Assert.assertEquals;
 
 import com.google.protobuf.ByteString;
@@ -25,9 +26,13 @@ import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
 import java.util.Iterator;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.bookkeeper.common.concurrent.FutureUtils;
 import org.bookkeeper.tests.proto.rpc.ChunkPingRequest;
 import org.bookkeeper.tests.proto.rpc.ChunkPongResponse;
 import org.bookkeeper.tests.proto.rpc.PingPongServiceGrpc;
@@ -103,6 +108,56 @@ public class ChunkedPingPongServiceTest {
             assertEquals(count, header.getSlotId());
             ++count;
         }
+    }
+
+    @Test
+    public void testClientStreaming() throws Exception {
+        final int numPings = 100;
+        final long sequence = ThreadLocalRandom.current().nextLong(100000);
+        final CompletableFuture<Void> respFuture = new CompletableFuture<>();
+        final LinkedBlockingQueue<ChunkPongResponse> respQueue = new LinkedBlockingQueue<>();
+        StreamObserver<ChunkPingRequest> pinger = client.lotsOfChunkPings(new StreamObserver<ChunkPongResponse>() {
+            @Override
+            public void onNext(ChunkPongResponse resp) {
+                respQueue.offer(resp);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                respFuture.completeExceptionally(t);
+            }
+
+            @Override
+            public void onCompleted() {
+                FutureUtils.complete(respFuture, null);
+            }
+        });
+
+        for (int i = 0; i < numPings; i++) {
+            PingRequest ping = PingRequest.newBuilder()
+                .setSequence(sequence + i)
+                .build();
+            ChunkPingRequest request = ChunkPingRequest.newBuilder()
+                .setHeader(ByteString.copyFrom(ping.toByteArray()))
+                .setPayload(ByteString.copyFrom(ping.toByteArray()))
+                .build();
+            pinger.onNext(request);
+        }
+        pinger.onCompleted();
+
+        // wait for response to be received.
+        result(respFuture);
+
+        assertEquals(1, respQueue.size());
+
+        ChunkPongResponse resp = respQueue.take();
+        PongResponse header = PongResponse.parseFrom(resp.getHeader());
+        PongResponse payload = PongResponse.parseFrom(resp.getPayload());
+        assertEquals(header, payload);
+
+        assertEquals(sequence + numPings - 1, header.getLastSequence());
+        assertEquals(numPings, header.getNumPingReceived());
+        assertEquals(0, header.getSlotId());
     }
 
 }

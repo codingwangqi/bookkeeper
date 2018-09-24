@@ -27,12 +27,12 @@ import com.google.protobuf.WireFormat;
 import io.grpc.MethodDescriptor;
 import io.grpc.MethodDescriptor.Marshaller;
 import io.grpc.internal.ReadableBuffer;
-import io.grpc.protobuf.ProtoUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import java.io.IOException;
 import java.io.InputStream;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.common.streaming.grpc.DrainableByteBufInputStream;
 import org.apache.bookkeeper.common.streaming.grpc.GetReadableBuffer;
 import org.apache.bookkeeper.common.streaming.proto.DataChunk;
@@ -40,15 +40,13 @@ import org.apache.bookkeeper.common.streaming.proto.DataChunk;
 /**
  * An in-memory representation of {@link DataChunk} in the stream.
  */
+@Slf4j
 public class ChunkMessage implements AutoCloseable {
 
     private static final int HEADER_TAG =
         (DataChunk.HEADER_FIELD_NUMBER << 3) | WireFormat.WIRETYPE_LENGTH_DELIMITED;
     private static final int PAYLOAD_TAG =
         (DataChunk.PAYLOAD_FIELD_NUMBER << 3) | WireFormat.WIRETYPE_LENGTH_DELIMITED;
-
-    private static Marshaller<DataChunk> NO_PAYLOAD_MARSHALLER =
-        ProtoUtils.marshaller(DataChunk.getDefaultInstance());
 
     private static ChunkMessage frame(ByteBufAllocator allocator, InputStream in) {
         try {
@@ -73,6 +71,7 @@ public class ChunkMessage implements AutoCloseable {
                 default:
                     // skip unknown fields
                     int size = readRawVarint32(in);
+                    log.warn("Ignored unknown tag : {}, size = {}", tag, size);
                     in.skip(size);
                     break;
             }
@@ -88,7 +87,7 @@ public class ChunkMessage implements AutoCloseable {
             // this is the slow path
             buffer = allocator.heapBuffer(size);
             byte[] underlyingArray = buffer.array();
-            int arrayOffset = buffer.arrayOffset();
+            int arrayOffset = buffer.arrayOffset() + buffer.readerIndex();
             ByteStreams.readFully(in ,underlyingArray, arrayOffset, size);
         } else {
             // this is the fast path
@@ -118,7 +117,11 @@ public class ChunkMessage implements AutoCloseable {
 
         @Override
         public InputStream stream(ChunkMessage msg) {
-            return msg.asInputStream(allocator);
+            try {
+                return msg.asInputStream(allocator);
+            } finally {
+                msg.close();
+            }
         }
 
         @Override
@@ -179,7 +182,7 @@ public class ChunkMessage implements AutoCloseable {
             true,
             2,
             initialBuf,
-            payload);
+            payload.retain());
         return new DrainableByteBufInputStream(bb);
     }
 

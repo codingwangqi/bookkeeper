@@ -63,7 +63,11 @@ class ChunkedPingPongService {
             log.error("Received invalid ping request : ", e);
             respObserver.onError(new StatusRuntimeException(Status.INTERNAL));
             return;
+        } finally {
+            // release the request
+            request.close();
         }
+        log.info("Received ping request : header = {}, payload = {}", requestHeader, requestPayload);
 
         if (!requestHeader.equals(requestPayload)) {
             log.error("Receive unmatched header and payload : header = {}, payload = {}",
@@ -79,12 +83,11 @@ class ChunkedPingPongService {
                 .setLastSequence(sequence)
                 .setSlotId(i)
                 .build();
-            try (ChunkMessage message = new ChunkMessage(
+            // the marshaller is responsible for release the message
+            ChunkMessage message = new ChunkMessage(
                 Unpooled.wrappedBuffer(resp.toByteArray()),
-                Unpooled.wrappedBuffer(resp.toByteArray())
-            )) {
-                respObserver.onNext(message);
-            }
+                Unpooled.wrappedBuffer(resp.toByteArray()));
+            respObserver.onNext(message);
         }
         respObserver.onCompleted();
     }
@@ -141,12 +144,10 @@ class ChunkedPingPongService {
                     .setLastSequence(lastSequence)
                     .setSlotId(0)
                     .build();
-                try (ChunkMessage message = new ChunkMessage(
+                ChunkMessage message = new ChunkMessage(
                     Unpooled.wrappedBuffer(resp.toByteArray()),
-                    Unpooled.wrappedBuffer(resp.toByteArray())
-                )) {
-                    respObserver.onNext(message);
-                }
+                    Unpooled.wrappedBuffer(resp.toByteArray()));
+                respObserver.onNext(message);
                 respObserver.onCompleted();
             }
         };
