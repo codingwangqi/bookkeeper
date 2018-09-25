@@ -207,4 +207,56 @@ public class HelpersTest extends EtcdTestBase {
         return ks;
     }
 
+    private void testKeyStreamIterator(int numKeys, int batchSize) throws Exception {
+        for (int i = 0; i < numKeys; i++) {
+            String key = getKey(scope, i);
+            ByteSequence keyBs = ByteSequence.fromBytes(key.getBytes(UTF_8));
+            result(etcdClient.getKVClient().put(keyBs, keyBs));
+        }
+
+        KeyStream<Integer> ks = openKeyStream(batchSize);
+        KeyStreamIterator<Integer> ksi = new KeyStreamIterator<>(ks);
+        AtomicInteger numReceived = new AtomicInteger(0);
+        while (ksi.hasNext()) {
+            int value = ksi.next();
+            assertEquals(numReceived.getAndIncrement(), value);
+        }
+        assertEquals(numKeys, numReceived.get());
+    }
+
+    @Test
+    public void testKeyStreamIteratorBatch1() throws Exception {
+        testKeyStreamIterator(20, 1);
+    }
+
+    @Test
+    public void testKeyStreamIteratorBatch2() throws Exception {
+        testKeyStreamIterator(20, 2);
+    }
+
+    @Test
+    public void testKeyStreamIteratorBatch7() throws Exception {
+        testKeyStreamIterator(20, 7);
+    }
+
+    @Test
+    public void testKeyStreamIteratorBatch10() throws Exception {
+        testKeyStreamIterator(20, 10);
+    }
+
+    @Test
+    public void testKeyStreamIteratorBatch20() throws Exception {
+        testKeyStreamIterator(20, 20);
+    }
+
+    @Test
+    public void testKeyStreamIteratorBatch40() throws Exception {
+        testKeyStreamIterator(20, 40);
+    }
+
+    @Test
+    public void testKeyStreamIteratorBatchUnlimited() throws Exception {
+        testKeyStreamIterator(20, 0);
+    }
+
 }

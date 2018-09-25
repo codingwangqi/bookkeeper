@@ -36,6 +36,7 @@
     <module>protocol</module>
     <module>core</module>
     <module>io</module>
+    <module>etcd</module>
   </modules>
   <build>
     <plugins>
