@@ -18,6 +18,7 @@
  */
 package org.apache.bookkeeper.metadata.etcd;
 
+import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.AUDITOR_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.BUCKETS_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.COOKIES_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.END_SEP;
@@ -25,6 +26,7 @@ import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.INSTANCEID_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.LAYOUT_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.LEDGERS_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.MEMBERS_NODE;
+import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.MEMBER_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.READONLY_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.UR_NODE;
 import static org.apache.bookkeeper.metadata.etcd.EtcdConstants.WRITEABLE_NODE;
@@ -139,6 +141,22 @@ final class EtcdUtils {
 
     static String getUnderreplicationPath(String scope) {
         return String.format("%s/%s", scope, UR_NODE);
+    }
+
+    static String getAuditorElectionPath(String scope) {
+        return String.format("%s/%s", scope, AUDITOR_NODE);
+    }
+
+    static String getAuditorVotePath(String scope) {
+        return String.format("%s/%s/%", scope, AUDITOR_NODE, MEMBER_NODE);
+    }
+
+    static String getAuditorVotePath(String scope, String voteName) {
+        return String.format("%s/%s/%s", scope, AUDITOR_NODE, voteName);
+    }
+
+    static String getAuditorVotePath(String scope, long voteId) {
+        return String.format("%s/%s/%%d", scope, AUDITOR_NODE, MEMBER_NODE, voteId);
     }
 
     static <T> T ioResult(CompletableFuture<T> future) throws IOException {

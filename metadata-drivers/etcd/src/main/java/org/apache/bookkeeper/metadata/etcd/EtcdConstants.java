@@ -47,6 +47,13 @@ final class EtcdConstants {
     //
 
     public static final String UR_NODE = "underreplication";
+    public static final String AUDITOR_NODE = "auditorelection";
+
+    //
+    // Election related constants
+    //
+
+    public static final String MEMBER_NODE = "member_";
 
     public static final ByteSequence EMPTY_BS  = ByteSequence.fromBytes(new byte[0]);
 
