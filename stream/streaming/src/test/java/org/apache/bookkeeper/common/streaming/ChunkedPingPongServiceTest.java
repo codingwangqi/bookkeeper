@@ -23,9 +23,9 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
 import java.util.Iterator;
@@ -61,14 +61,14 @@ public class ChunkedPingPongServiceTest {
     public void setup() throws Exception {
         this.service = new ChunkedPingPongService(NUM_PONGS_PER_PING);
         MutableHandlerRegistry registry = new MutableHandlerRegistry();
-        this.grpcServer = InProcessServerBuilder
-            .forName(SERVICE_NAME)
+        this.grpcServer = ServerBuilder
+            .forPort(0)
             .fallbackHandlerRegistry(registry)
-            .directExecutor()
-            .build()
-            .start();
+            .build();
+        this.grpcServer.start();
         registry.addService(this.service.bindService());
-        this.clientChannel = InProcessChannelBuilder.forName(SERVICE_NAME)
+        this.clientChannel = ManagedChannelBuilder
+            .forAddress("127.0.0.1", grpcServer.getPort())
             .usePlaintext()
             .build();
         this.client = PingPongServiceGrpc.newStub(clientChannel);

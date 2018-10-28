@@ -18,49 +18,42 @@
 
 package org.apache.bookkeeper.common.streaming.grpc;
 
+import io.grpc.internal.CompositeReadableBuffer;
 import io.grpc.internal.ReadableBuffer;
-import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.util.Queue;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Enable access to ReadableBuffer directly to copy data from an
- * {@link io.grpc.internal.ReadableBuffers.BufferInputStream} into a target {@link java.nio.ByteBuffer} or
- * {@link io.netty.buffer.ByteBuf}.
+ * Util class to access `buffers` in {@link CompositeReadableBuffer}.
  */
 @Slf4j
-class GetReadableBuffer {
+class GetCompositeReadableBuffer {
 
-    private static final Field READABLE_BUFFER;
-    private static final Class<?> BUFFER_INPUT_STREAM;
+    private static final Field BUFFERS;
 
     static {
         Field tmpField = null;
-        Class<?> tmpClazz = null;
         try {
-            Class<?> clazz = Class.forName("io.grpc.internal.ReadableBuffers$BufferInputStream");
-
-            Field f = clazz.getDeclaredField("buffer");
+            Class<?> clazz = CompositeReadableBuffer.class;
+            Field f = clazz.getDeclaredField("buffers");
             f.setAccessible(true);
-            // don't set until we've gotten past all exception cases.
+            // don't set until we've gotten pass all exception cases.
             tmpField = f;
-            tmpClazz = clazz;
         } catch (Exception e) {
-            log.warn("Failed to access BufferInputStream", e);
+            log.warn("Failed to access CompositeReadableBuffer", e);
         }
-        READABLE_BUFFER = tmpField;
-        BUFFER_INPUT_STREAM = tmpClazz;
+        BUFFERS = tmpField;
     }
 
-    static ReadableBuffer getReadableBuffer(InputStream is) {
-        if (BUFFER_INPUT_STREAM == null || !is.getClass().equals(BUFFER_INPUT_STREAM)) {
+    static Queue<ReadableBuffer> getBuffers(CompositeReadableBuffer buffer) {
+        if (BUFFERS == null) {
             return null;
         }
-
         try {
-            return (ReadableBuffer) READABLE_BUFFER.get(is);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            return (Queue<ReadableBuffer>) BUFFERS.get(buffer);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

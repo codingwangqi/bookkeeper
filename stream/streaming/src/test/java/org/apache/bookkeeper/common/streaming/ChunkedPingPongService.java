@@ -84,7 +84,7 @@ class ChunkedPingPongService {
                 .setSlotId(i)
                 .build();
             // the marshaller is responsible for release the message
-            ChunkMessage message = new ChunkMessage(
+            ChunkMessage message = ChunkMessage.newMessage(
                 Unpooled.wrappedBuffer(resp.toByteArray()),
                 Unpooled.wrappedBuffer(resp.toByteArray()));
             respObserver.onNext(message);
@@ -144,7 +144,7 @@ class ChunkedPingPongService {
                     .setLastSequence(lastSequence)
                     .setSlotId(0)
                     .build();
-                ChunkMessage message = new ChunkMessage(
+                ChunkMessage message = ChunkMessage.newMessage(
                     Unpooled.wrappedBuffer(resp.toByteArray()),
                     Unpooled.wrappedBuffer(resp.toByteArray()));
                 respObserver.onNext(message);

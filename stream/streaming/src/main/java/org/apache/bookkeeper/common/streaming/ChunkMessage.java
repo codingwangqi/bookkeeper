@@ -26,15 +26,15 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.google.protobuf.WireFormat;
 import io.grpc.MethodDescriptor;
 import io.grpc.MethodDescriptor.Marshaller;
-import io.grpc.internal.ReadableBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.util.Recycler;
 import java.io.IOException;
 import java.io.InputStream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.common.streaming.grpc.DrainableByteBufInputStream;
-import org.apache.bookkeeper.common.streaming.grpc.GetReadableBuffer;
+import org.apache.bookkeeper.common.streaming.grpc.ReadableBufferUtils;
 import org.apache.bookkeeper.common.streaming.proto.DataChunk;
 
 /**
@@ -76,14 +76,13 @@ public class ChunkMessage implements AutoCloseable {
                     break;
             }
         }
-        return new ChunkMessage(header, payload);
+        return ChunkMessage.newMessage(header, payload);
     }
 
     private static ByteBuf doFrameBuffer(ByteBufAllocator allocator, InputStream in) throws IOException {
         int size = readRawVarint32(in);
-        ReadableBuffer readableBuffer = GetReadableBuffer.getReadableBuffer(in);
-        ByteBuf buffer;
-        if (null == readableBuffer) {
+        ByteBuf buffer = ReadableBufferUtils.read(in, size);
+        if (null == buffer) {
             // this is the slow path
             buffer = allocator.heapBuffer(size);
             byte[] underlyingArray = buffer.array();
@@ -91,10 +90,9 @@ public class ChunkMessage implements AutoCloseable {
             ByteStreams.readFully(in ,underlyingArray, arrayOffset, size);
         } else {
             // this is the fast path
-            buffer = allocator.buffer(size);
-            readableBuffer.readBytes(buffer.nioBuffer(0, size));
+            in.skip(size);
         }
-        buffer.writerIndex(size);
+        buffer.writerIndex(buffer.readerIndex() + size);
         return buffer;
     }
 
@@ -130,12 +128,30 @@ public class ChunkMessage implements AutoCloseable {
         }
     }
 
-    private final ByteBuf header;
-    private final ByteBuf payload;
+    public static ChunkMessage newMessage(ByteBuf header, ByteBuf payload) {
+        return RECYCLER.get().reset(header, payload);
+    }
 
-    public ChunkMessage(ByteBuf header, ByteBuf payload) {
+    static final Recycler<ChunkMessage> RECYCLER = new Recycler<ChunkMessage>() {
+        @Override
+        protected ChunkMessage newObject(Handle<ChunkMessage> handle) {
+            return new ChunkMessage(handle);
+        }
+    };
+
+    private final Recycler.Handle<ChunkMessage> handle;
+
+    private ByteBuf header;
+    private ByteBuf payload;
+
+    ChunkMessage(Recycler.Handle<ChunkMessage> handle) {
+        this.handle = handle;
+    }
+
+    ChunkMessage reset(ByteBuf header, ByteBuf payload) {
         this.header = header;
         this.payload = payload;
+        return this;
     }
 
     public ByteBuf getHeader() {
@@ -188,8 +204,15 @@ public class ChunkMessage implements AutoCloseable {
 
     @Override
     public void close() {
-        header.release();
-        payload.release();
+        if (null != header) {
+            header.release();
+        }
+        if (null != payload) {
+            payload.release();
+        }
+        if (null != handle) {
+            handle.recycle(this);
+        }
     }
 
 }
